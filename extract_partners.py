@@ -186,11 +186,16 @@ def require_pdftotext() -> str:
 def pdf_to_pages(pdf: Path) -> list[list[str]]:
     """Return the PDF as a list of pages, each a list of lines (layout mode)."""
     exe = require_pdftotext()
+    # Capture raw bytes and decode them ourselves. `text=True` would decode with
+    # the OS default codec, which on Windows is cp1252 and cannot represent the
+    # UTF-8 that `-enc UTF-8` produces (UnicodeDecodeError on any curly quote,
+    # dash or accent). errors="replace" keeps one odd glyph from killing a run.
     result = subprocess.run(
         [exe, "-layout", "-enc", "UTF-8", str(pdf), "-"],
-        capture_output=True, text=True, check=True,
+        capture_output=True, check=True,
     )
-    pages = result.stdout.split("\f")
+    text = result.stdout.decode("utf-8", errors="replace")
+    pages = text.split("\f")
     if pages and not pages[-1].strip():
         pages.pop()  # pdftotext ends with a trailing form feed
     return [p.splitlines() for p in pages]
@@ -527,6 +532,15 @@ def process(pdf: Path, out_dir: Path, dump: bool, archive_dir: Path | None) -> i
 
 
 def main() -> None:
+    # A legacy Windows console defaults to cp1252 and raises UnicodeEncodeError
+    # when a project title contains anything outside it (e.g. "Māori", "Łódź").
+    # Never let a console limitation abort an otherwise good extraction.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
     require_pdftotext()   # hard stop before any other work
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdfs", nargs="*", type=Path, help="specific PDF(s); default: every *.pdf in --data")

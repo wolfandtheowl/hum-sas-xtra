@@ -208,6 +208,15 @@ warning worth taking seriously.
 Usually the applicant typed something unexpected into the form. Check that row
 in the CSV and correct it by hand.
 
+**`UnicodeDecodeError: 'charmap' codec can't decode byte ...`**
+You are on an old version of this script. Pull the latest and re-run. (Windows
+decoded the PDF text using cp1252 instead of UTF-8; this is fixed.)
+
+**Folder name for Poppler**
+Renaming the unzipped folder to `vendor/poppler` is fine, and so is leaving the
+release folder nested inside it. Any `bin` folder below `vendor/poppler` is
+found automatically.
+
 **Accents look wrong, or everything lands in column A, when opened in Excel**
 The CSV file itself is correct — this is Excel's import setting.
 Use **Data ▸ From Text/CSV**, choose **65001: Unicode (UTF-8)** and **Comma**
