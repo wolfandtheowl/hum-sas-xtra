@@ -1,0 +1,6 @@
+# Vendored Poppler binaries - each machine installs its own (see README.md §1.2)
+vendor/
+
+exports/_debug/
+.DS_Store
+__pycache__/

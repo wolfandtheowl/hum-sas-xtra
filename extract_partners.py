@@ -27,7 +27,8 @@ lives.
 Requirements
 ------------
 * Python 3.9+ (standard library only)
-* `pdftotext` from poppler on the PATH  (macOS: `brew install poppler`)
+* `pdftotext` from poppler: on the PATH, or unzipped into ./vendor/poppler/
+  (macOS: `brew install poppler`)  -- see README.md
 
 How it works (see plan/01_approach.md for the long version)
 ----------------------------------------------------------
@@ -127,38 +128,66 @@ class Meta:
 # Step 1 - PDF -> text
 # ----------------------------------------------------------------------------
 
+# Poppler may be vendored inside this repo (vendor/poppler/...), which keeps a
+# Windows install self-contained instead of littering C:\. Any bin directory
+# below vendor/poppler is searched, so the layout of the unzipped release does
+# not matter.
+VENDOR_DIR = Path(__file__).resolve().parent / "vendor" / "poppler"
+
 PDFTOTEXT_MISSING_MSG = """\
 ERROR: `pdftotext` was not found.
 
 This program cannot read PDFs without it. Install Poppler, then re-run.
 
-  Windows (Git Bash) : download "Release-xx.xx.x-0.zip" from
-                       https://github.com/oschwartz10612/poppler-windows/releases
-                       unzip it, then add its Library/bin folder to PATH, e.g.
-                         export PATH="$PATH:/c/poppler/Library/bin"
-                       Add that line to ~/.bashrc to make it permanent.
-  macOS              : brew install poppler
-  Debian/Ubuntu      : sudo apt install poppler-utils
+  Windows (Git Bash)
+      Keep it inside this project - nothing is installed system-wide:
+        1. Download "Release-xx.xx.x-0.zip" from
+           https://github.com/oschwartz10612/poppler-windows/releases
+        2. Unzip it into:  {vendor}
+           so that a "bin" folder containing pdftotext.exe sits somewhere below.
+        3. Re-run this program. It finds it automatically - no PATH editing.
 
-Check it worked with:  pdftotext -v
+  macOS          : brew install poppler
+  Debian/Ubuntu  : sudo apt install poppler-utils
+
+Check a system-wide install with:  pdftotext -v
 """
 
 
-def require_pdftotext() -> None:
-    """Abort immediately unless the poppler `pdftotext` binary is usable."""
-    if shutil.which("pdftotext") is None:
-        sys.exit(PDFTOTEXT_MISSING_MSG)
+def find_pdftotext() -> str | None:
+    """
+    Locate the `pdftotext` binary.
+
+    A copy vendored inside this repo wins over a system-wide one, so a machine
+    without admin rights (or without Homebrew) can run entirely self-contained.
+    """
+    names = ("pdftotext.exe", "pdftotext")
+    if VENDOR_DIR.is_dir():
+        for name in names:
+            # Any depth: vendor/poppler/bin, vendor/poppler/Library/bin, etc.
+            for cand in sorted(VENDOR_DIR.rglob(name)):
+                if cand.is_file():
+                    return str(cand)
+    return shutil.which("pdftotext")
+
+
+def require_pdftotext() -> str:
+    """Abort immediately unless a usable `pdftotext` binary is available."""
+    exe = find_pdftotext()
+    if exe is None:
+        sys.exit(PDFTOTEXT_MISSING_MSG.format(vendor=VENDOR_DIR))
     try:
-        subprocess.run(["pdftotext", "-v"], capture_output=True, check=True)
+        subprocess.run([exe, "-v"], capture_output=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        sys.exit(PDFTOTEXT_MISSING_MSG)
+        sys.exit(PDFTOTEXT_MISSING_MSG.format(vendor=VENDOR_DIR))
+    return exe
 
 
 def pdf_to_pages(pdf: Path) -> list[list[str]]:
     """Return the PDF as a list of pages, each a list of lines (layout mode)."""
-    require_pdftotext()
+    exe = require_pdftotext()
     result = subprocess.run(
-        ["pdftotext", "-layout", "-enc", "UTF-8", str(pdf), "-"],
+        [exe, "-layout", "-enc", "UTF-8", str(pdf), "-"],
         capture_output=True, text=True, check=True,
     )
     pages = result.stdout.split("\f")

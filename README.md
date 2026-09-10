@@ -38,29 +38,35 @@ pdftotext -v
 
 Expect something like `pdftotext version 24.02.0`.
 
-If you get "command not found", install it:
+If you get "command not found", install it using the section for your system
+below. On Windows the copy lives inside this project and is **not** on your
+PATH, so `pdftotext -v` will keep saying "command not found" — that is normal.
+Confirm it instead by simply running the program (§3).
 
-**Windows (Git Bash)**
+**Windows (Git Bash)** — keep it inside this project, install nothing system-wide
 
 1. Go to <https://github.com/oschwartz10612/poppler-windows/releases>
 2. Download the newest `Release-xx.xx.x-0.zip`.
-3. Unzip it to `C:\poppler`.
-4. Confirm the folder `C:\poppler\Library\bin` exists and contains `pdftotext.exe`.
-5. Tell Git Bash where it is:
+3. Unzip it into a `vendor/poppler` folder **inside this project**, so you end up
+   with something like:
 
-```bash
-echo 'export PATH="$PATH:/c/poppler/Library/bin"' >> ~/.bashrc
-source ~/.bashrc
+```
+<this project>/vendor/poppler/poppler-24.08.0/Library/bin/pdftotext.exe
 ```
 
-6. Verify:
+4. That is all. Re-run the program — it finds `pdftotext.exe` automatically.
+
+> **No PATH editing, no `.bashrc`, nothing written to `C:\`.** The exact folder
+> name inside `vendor/poppler` does not matter; any `bin` folder below it is
+> found. `vendor/` is git-ignored, so these binaries are never committed.
+
+If you prefer, create the folder first:
 
 ```bash
-pdftotext -v
+mkdir -p vendor/poppler
 ```
 
-> Note the path style: `C:\poppler\Library\bin` becomes `/c/poppler/Library/bin`
-> in Git Bash. Forward slashes, and `/c/` instead of `C:`.
+then unzip into it.
 
 **macOS**
 
@@ -74,7 +80,8 @@ brew install poppler
 sudo apt install poppler-utils
 ```
 
-Do not continue until `pdftotext -v` prints a version.
+Do not continue until either `pdftotext -v` prints a version (macOS / Linux),
+or `vendor/poppler/.../bin/pdftotext.exe` exists (Windows).
 
 ---
 
@@ -83,6 +90,7 @@ Do not continue until `pdftotext -v` prints a version.
 ```
 .
 ├── extract_partners.py   the program
+├── vendor/poppler/       Windows only: unzipped Poppler (git-ignored)
 ├── data/                 PUT YOUR PDFs HERE
 │   └── processed/        finished PDFs are moved here automatically
 └── exports/              your finished CSVs appear here
@@ -181,8 +189,12 @@ CSVs are simply rewritten.
 ## 6. Troubleshooting
 
 **`ERROR: pdftotext was not found`**
-Poppler is not installed, or not on your PATH. Go back to §1.2.
-On Windows, remember `source ~/.bashrc` (or just close and reopen Git Bash).
+Go back to §1.2. On Windows, check that a `bin` folder containing
+`pdftotext.exe` really does sit somewhere below `vendor/poppler/` — the most
+common mistake is unzipping one level too deep, leaving
+`vendor/poppler/Release-24.08.0/poppler-24.08.0/...` when you only meant one
+`vendor/poppler/poppler-24.08.0/...`. The error message prints the exact folder
+being searched.
 
 **`No new PDFs in data. N already in data/processed`**
 Everything is done already. Add new PDFs to `data/`, or use `--redo`.
@@ -209,7 +221,8 @@ Try `python` instead of `python3`.
 ## 7. Quick reference
 
 ```bash
-pdftotext -v                      # 1. confirm Poppler is installed
+pdftotext -v                      # 1. confirm Poppler (macOS/Linux; on
+                                  #    Windows just check vendor/poppler/)
 python3 --version                 # 2. confirm Python is installed
 cp /path/to/*.pdf data/           # 3. add PDFs
 python3 extract_partners.py       # 4. run
