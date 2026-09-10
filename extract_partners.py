@@ -127,13 +127,36 @@ class Meta:
 # Step 1 - PDF -> text
 # ----------------------------------------------------------------------------
 
+PDFTOTEXT_MISSING_MSG = """\
+ERROR: `pdftotext` was not found.
+
+This program cannot read PDFs without it. Install Poppler, then re-run.
+
+  Windows (Git Bash) : download "Release-xx.xx.x-0.zip" from
+                       https://github.com/oschwartz10612/poppler-windows/releases
+                       unzip it, then add its Library/bin folder to PATH, e.g.
+                         export PATH="$PATH:/c/poppler/Library/bin"
+                       Add that line to ~/.bashrc to make it permanent.
+  macOS              : brew install poppler
+  Debian/Ubuntu      : sudo apt install poppler-utils
+
+Check it worked with:  pdftotext -v
+"""
+
+
+def require_pdftotext() -> None:
+    """Abort immediately unless the poppler `pdftotext` binary is usable."""
+    if shutil.which("pdftotext") is None:
+        sys.exit(PDFTOTEXT_MISSING_MSG)
+    try:
+        subprocess.run(["pdftotext", "-v"], capture_output=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit(PDFTOTEXT_MISSING_MSG)
+
+
 def pdf_to_pages(pdf: Path) -> list[list[str]]:
     """Return the PDF as a list of pages, each a list of lines (layout mode)."""
-    if shutil.which("pdftotext") is None:
-        sys.exit(
-            "ERROR: `pdftotext` not found on PATH. Install poppler "
-            "(macOS: brew install poppler; Debian/Ubuntu: apt install poppler-utils)."
-        )
+    require_pdftotext()
     result = subprocess.run(
         ["pdftotext", "-layout", "-enc", "UTF-8", str(pdf), "-"],
         capture_output=True, text=True, check=True,
@@ -475,6 +498,7 @@ def process(pdf: Path, out_dir: Path, dump: bool, archive_dir: Path | None) -> i
 
 
 def main() -> None:
+    require_pdftotext()   # hard stop before any other work
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdfs", nargs="*", type=Path, help="specific PDF(s); default: every *.pdf in --data")
     ap.add_argument("--data", type=Path, default=Path("data"))
